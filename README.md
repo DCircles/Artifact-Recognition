@@ -1,7 +1,3 @@
-我来先了解一下项目的结构和功能，然后为您生成README.md。
-
-现在我来为您生成README.md文件：
-
 ```markdown
 # 文物识别 Agent
 
@@ -140,17 +136,8 @@ curl -X POST "http://127.0.0.1:8080/identify" \
 - 识别结果不得用于商业用途
 - 建议结合专业资料进行深入研究
 
-## 📄 许可证
 
-MIT License
 
-## 🤝 贡献
-
-欢迎提交 Issue 和 Pull Request！
-
-## 📧 联系方式
-
-如有问题或建议，欢迎通过 GitHub Issues 联系。
 ```
 
 这个README文档包含了：
@@ -161,5 +148,3 @@ MIT License
 5. ✅ 项目结构说明
 6. ✅ 核心功能介绍
 7. ✅ 注意事项和免责声明
-
-您可以将此文件保存为 `README.md` 放在项目根目录中。

@@ -75,9 +75,9 @@ def save_assistant_messages(user_id: str, image_hash: str, question: str, conten
     finally:
         conn.close()
 
-def get_history(user_id: str, limit: int = 6) -> List[Dict[str, Any]]:
+def get_history(user_id: str, limit: int = 5) -> List[Dict[str, Any]]:
     """
-    获取指定会话的历史记录
+    根据 user_id 获取角色和内容
     返回格式适配 LangChain 的 MessagesPlaceholder
     """
     conn = sqlite3.connect(DB_PATH)
@@ -91,10 +91,10 @@ def get_history(user_id: str, limit: int = 6) -> List[Dict[str, Any]]:
     conn.close()
 
     # 转换为 LangChain 兼容的字典列表
-    # 注意：数据库取出是倒序，这里需要反转回正序
+    # 数据库取出是倒序，需要反转回正序
     history = [{"role": row[0], "content": row[1]} for row in reversed(rows)]
     return history
 
 
-# 模块加载时自动初始化数据库
+# 自动初始化数据库
 init_db()
