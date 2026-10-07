@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Artifact Agent(文物识别助手)</title>
+<style>
+        body { font-family: sans-serif; padding: 40px; max-width: 600px; margin: auto; }
+        .card { border: 1px solid #ddd; padding: 20px; border-radius: 8px; margin-top: 20px; }
+        input, button { margin: 10px 0; padding: 8px; width: 100%; box-sizing: border-box; }
+        button { background-color: #4CAF50; color: white; border: none; cursor: pointer; }
+        button:disabled { background-color: #ccc; }
+        pre { white-space: pre-wrap; background: #f4f4f4; padding: 10px; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <h2>🏺 文物识别 Agent</h2>
+    <div class="card">
+        <label>会话 ID (保持相同ID可连续对话):</label>
+        <input type="text" id="user_id" value="user_001">
+
+        <label>上传文物图片:</label>
+        <input type="file" id="fileInput" accept="image/*">
+
+        <label>补充描述 (可选):</label>
+        <input type="text" id="userQuery" placeholder="请识别图中的文物">
+
+        <button id="submitBtn" onclick="identifyArtifact()">开始鉴定</button>
+    </div>
+
+    <div class="card" id="resultCard" style="display:none;">
+        <h3>鉴定结果:</h3>
+        <pre id="resultText"></pre>
+    </div>
+
+    <script>
+        async function identifyArtifact() {
+            const user_id = document.getElementById('user_id').value;
+            const fileInput = document.getElementById('fileInput');
+            const userQuery = document.getElementById('userQuery').value || '请帮我鉴定这件文物';
+            const submitBtn = document.getElementById('submitBtn');
+            const resultCard = document.getElementById('resultCard');
+            const resultText = document.getElementById('resultText');
+
+            if (!fileInput.files.length) {
+                alert('请先选择一张图片！');
+                return;
+            }
+
+            // 准备 FormData (对应后端的 File 和 Form 参数)
+            const formData = new FormData();
+            formData.append('user_id', user_id);
+            formData.append('file', fileInput.files[0]);
+            formData.append('user_query', userQuery);
+
+            // 按钮状态控制
+            submitBtn.disabled = true;
+            submitBtn.innerText = 'AI 正在鉴定中，请稍候...';
+            resultCard.style.display = 'none';
+
+            try {
+                // 发送 POST 请求到你的 FastAPI 后端
+                const response = await fetch('http://127.0.0.1:8000/identify', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (data.status === 'success') {
+                    resultText.innerText = data.result;
+                } else {
+                    resultText.innerText = '发生错误: ' + data.detail;
+                }
+                resultCard.style.display = 'block';
+            } catch (error) {
+                alert('请求失败，请确保 FastAPI 后端已启动！');
+                console.error(error);
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.innerText = '开始鉴定';
+            }
+        }
+    </script>
+</body>
+</html>
