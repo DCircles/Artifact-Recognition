@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>文物识别 Agent</title>
+    <!-- 1. 引入 Element Plus 的样式 -->
+    <link rel="stylesheet" href="//unpkg.com/element-plus/dist/index.css" />
+    <style>
+        body { background-color: #f5f7fa; font-family: 'Helvetica Neue', Helvetica, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', Arial, sans-serif; }
+        .container { max-width: 800px; margin: 40px auto; }
+        .preview-img { width: 100px; max-height: 300px; object-fit: contain; border-radius: 8px; margin-top: 10px; border: 1px solid #dcdfe6; }
+        .result-box { white-space: pre-wrap; line-height: 1.6; max-height: 200px; }
+        /* 简单的 Markdown 样式模拟 */
+        .result-box h3 { color: #409EFF; border-bottom: 1px solid #eee; padding-bottom: 5px; }
+        .result-box strong { color: #303133; }
+        .el-form-item__label { width: 90px; }
+    </style>
+</head>
+<body>
+
+<div id="app" class="container">
+    <!-- 标题 -->
+    <div style="text-align: center; margin-bottom: 30px;">
+        <h1 style="color: #303133;">🏺 文物识别 Agent</h1>
+<!--        <p style="color: #909399;">上传文物图片，AI 帮你鉴定身份与历史背景</p>-->
+    </div>
+
+    <el-row :gutter="20">
+        <!-- 左侧：上传与输入区 -->
+        <el-col :span="24">
+            <el-card shadow="hover">
+                <template #header>
+                    <div class="card-header">
+                        <span>📸 图片上传与描述</span>
+                    </div>
+                </template>
+
+                <!-- 会话 ID (可以隐藏或做成自动生成的) -->
+                <el-form label-position="left">
+                    <el-form-item label="用户ID：">
+                        <el-input v-model="userId" style="width: 200px;" placeholder="例如: user_1"></el-input>
+                    </el-form-item>
+
+                    <!-- 图片上传预览区 -->
+                    <el-form-item label="图  片：">
+                        <el-upload
+                            v-model:file-list="fileList"
+                            class="upload-demo"
+                            accept="image/*"
+                            :limit="1"
+                            :auto-upload="false"
+                            :on-remove="handleRemove"
+                            :on-change="handleOnChange"
+                            :on-preview="handlePreview"
+                            list-type="picture"
+                          >
+                            <el-button type="primary">上  传</el-button>
+                            <template #tip>
+                              <div class="el-upload__tip">
+                                仅支持上传 .jpg, .jpeg, .png, .webp 格式的图片
+                              </div>
+                            </template>
+                          </el-upload>
+                    </el-form-item>
+
+                    <el-form-item label="补充描述：">
+                        <el-input v-model="userQuery" style="width: 70%" type="textarea" :rows="2" placeholder="请描述你想了解的内容，例如：这是哪个朝代的？"></el-input>
+                    </el-form-item>
+
+                    <div style="width: 100%; text-align: center;">
+                        <el-button type="success" size="large" style="width: 100px;"
+                                   @click="submitIdentify"
+                                   :loading="loading">
+                            {{ loading ? '正在鉴定中...' : '开始识别' }}
+                        </el-button>
+                    </div>
+                </el-form>
+            </el-card>
+        </el-col>
+
+        <!-- 右侧/下方：结果展示区 -->
+        <el-col :span="24" style="margin-top: 20px;">
+            <el-card shadow="always" v-if="resultContent">
+                <template #header>
+                    <div class="card-header">
+                        <span>📜 鉴定结果</span>
+                    </div>
+                </template>
+                <!-- 使用 v-html 渲染 Markdown 转换后的 HTML，或者直接显示文本 -->
+                <div class="result-box" v-html="formattedResult"></div>
+            </el-card>
+        </el-col>
+    </el-row>
+
+    <el-dialog v-if="openPreview" v-model="openPreview" title="图片预览" width="60%">
+        <image style="width: 100%" :src="previewUrl" />
+    </el-dialog>
+</div>
+
+<!-- 2. 引入 Vue 3 和 Element Plus JS -->
+<script src="//unpkg.com/vue@3/dist/vue.global.js"></script>
+<script src="//unpkg.com/element-plus"></script>
+<!-- 引入图标库 -->
+<script src="//unpkg.com/@element-plus/icons-vue"></script>
+<!-- 引入简单的 Markdown 解析器 (可选，为了好看) -->
+<script src="//cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
+<script>
+    const { createApp, ref, computed } = Vue;
+
+    const app = createApp({
+        setup() {
+            const userId = ref('user_1');
+            const userQuery = ref('');
+            // 图片
+            const fileList = ref([]);
+            const submitImg = ref(null)
+            // 用于预览图片的变量
+            const previewUrl = ref('');
+            const openPreview = ref(false)
+
+            // 结果相关
+            const loading = ref(false);
+            const resultContent = ref('');
+
+            const handleOnChange = (uploadFile) =>{
+                if(uploadFile.raw){
+                    submitImg.value = uploadFile.raw
+                }
+            }
+            const handleRemove = () => {
+                submitImg.value = null
+            }
+            const handlePreview = (file) => {
+                previewUrl.value = file.url
+                openPreview.value = true
+            }
+
+            // 提交识别
+            const submitIdentify = async () => {
+                if (!submitImg.value) {
+                    ElementPlus.ElMessage.warning('请先选择一张文物图片！');
+                    return;
+                }
+
+                loading.value = true;
+                resultContent.value = ''; // 清空旧结果
+
+                const formData = new FormData();
+                formData.append('file', submitImg.value);
+                formData.append('user_id', userId.value);
+                formData.append('user_query', userQuery.value || '请识别图中的文物');
+
+                try {
+                    // 假设你的后端跑在 localhost:8000
+                    const response = await fetch('http://127.0.0.1:8000/identify', {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    const data = await response.json();
+
+                    if (data.status === 'success') {
+                        resultContent.value = data.result;
+                        ElementPlus.ElMessage.success('识别成功！');
+                    } else {
+                        ElementPlus.ElMessage.error(data.detail || '识别失败');
+                    }
+                } catch (error) {
+                    console.error(error);
+                    ElementPlus.ElMessage.error('网络请求失败，请检查后端服务');
+                } finally {
+                    loading.value = false;
+                }
+            };
+
+            // 简单的 Markdown 格式化 (利用 marked 库)
+            const formattedResult = computed(() => {
+                console.log(resultContent.value)
+                 if (!resultContent.value) return '';
+                // 如果 marked 报错，可以尝试 marked(resultContent.value)
+                // 或者确保引入的是兼容版本的 marked
+                try {
+                    return marked.parse(resultContent.value);
+                } catch (e) {
+                    return resultContent.value; // 降级处理：如果解析失败直接显示原文
+                }
+            });
+
+            return {
+                userId, userQuery, fileList, submitImg,
+                previewUrl, handleRemove, handlePreview, openPreview,
+                loading, resultContent, submitIdentify, formattedResult, handleOnChange
+            };
+        }
+    });
+
+    // 注册所有图标
+    for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
+        app.component(key, component)
+    }
+
+    app.use(ElementPlus);
+    app.mount('#app');
+</script>
+</body>
+</html>

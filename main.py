@@ -4,10 +4,14 @@ from fastapi.params import Form
 from fastapi.responses import JSONResponse
 # CORS中间件，解决跨域问题
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.staticfiles import StaticFiles
+
 from agent import identification_chain
 from memory import save_message, save_assistant_messages, get_history, calc_img_hash, get_history_hash
+from oss_utils import upload_to_oss
 
 app = FastAPI(title="文物识别 Agent", description="一个用于识别文物的 FastAPI 应用")
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 app.add_middleware(
     CORSMiddleware,
@@ -31,12 +35,13 @@ async def artifact_identify(
     try:
         image_bytes = await file.read()
         image_hash = calc_img_hash(image_bytes)
-        image_b64 = base64.b64encode(image_bytes).decode("utf-8")
-        image_url = f"data:{file.content_type};base64,{image_b64}"
+        image_url, image_name = upload_to_oss(image_bytes, file.filename)
+
         # 获取历史数据
         history = get_history(user_id)
         # 是否存在重复图片+问题
         repeat_history = get_history_hash(user_id, image_hash, user_query)
+        print(repeat_history)
         # 命中
         if repeat_history:
             content = repeat_history
@@ -56,7 +61,7 @@ async def artifact_identify(
         })
         #保存对话
         ai_content = responses.content
-        save_message(user_id, "user", f"{user_query}[上传了图片]")
+        save_message(user_id, "user", f"{user_query}:{image_name}")
         save_message(user_id, "assistant", ai_content)
         save_assistant_messages(user_id, image_hash, user_query, ai_content)
 
